@@ -1,0 +1,1210 @@
+Upstream source: https://github.com/file/file
+Tag: FILE5_48
+Commit: eb754ace19fed5481d8142426543100a2d6bae4e
+Package version: file 5.48
+Compiled magic version: VERSIONNO 21, FILE_MAGICSIZE 432
+
+The initial identification path was based on the file 5.48 behavior in
+src/apprentice.c (compiled database layout), src/softmagic.c (pattern
+matching, name/use, descriptions), src/ascmagic.c and src/encoding.c
+(text fallback), and src/fsmagic.c (empty and unreadable files).
+It does not link libmagic and contains no cgo.
+
+The scanner compatibility target is FILE5_41 (file/libmagic 5.41), not
+FILE5_48. fsmagic.go now follows FILE5_41 src/fsmagic.c and src/magic.c
+for the scanner's MAGIC_NONE and MAGIC_MIME_TYPE|MAGIC_SYMLINK|MAGIC_ERROR
+handles. Its upstream copyright and license are retained in that file.
+encoding.go and ascmagic.go follow FILE5_41 src/encoding.c and
+src/ascmagic.c, including the 65536-byte encoding limit, UTF-16 code-unit
+behavior and incomplete UTF-8 handling. Both retain the upstream license.
+json.go and csv.go follow FILE5_41 src/is_json.c and src/is_csv.c,
+respectively, and retain their upstream licenses. These are format
+detectors with 5.41's permissive behavior, not general data validators.
+cdf.go and cdf_summary.go follow FILE5_41 src/cdf.c, src/readcdf.c and
+src/cdf_time.c for the scanner's two handles, retaining their upstream
+licenses. They read allocation chains, directory records and summary
+properties; no document type or Windows version is inferred from a raw
+byte substring. File reads use the same open descriptor beyond the
+initial prefix, whereas Buffer has no out-of-buffer source.
+elf.go, elf_notes.go and elf_core.go follow the complete runtime paths in
+FILE5_41 src/readelf.c and src/elfclass.h, retaining the upstream licenses.
+ELF analysis supplies a suffix and mode flags before softmagic; the loaded
+database, not a parallel Go architecture table, supplies the base type and
+MIME. Buffer intentionally does not run fd-based ELF analysis.
+MIME annotations follow FILE5_41 softmagic.c handle_annotation/varexpand,
+with a 1024-byte expansion buffer. An annotation ends its current match,
+not every caller: after use/indirect returns, a caller can append its own
+or a later annotation, or fail after the nested MIME was printed.
+An empty Buffer uses application/x-empty from funcs.c file_default;
+an empty regular File is handled earlier by fsmagic as inode/x-empty.
+String, Pascal string and search extents follow FILE5_41 softmagic.c
+mget: an empty match at EOF is allowed, but a start beyond EOF is not.
+A failed continuation read matches relation '!' without magiccheck;
+other failed reads skip the rule without clearing last_match.
+FILE_INDIRECT follows FILE5_41 softmagic.c mget/mprint and funcs.c
+file_push_buffer/file_pop_buffer: relative bases are opt-in, nested
+matching searches every loaded database, and its description is printed
+only by mget (without varexpand). Nested separators and trailing spaces
+are retained; file_getbuffer does not trim them.
+FILE_USE follows FILE5_41 softmagic.c save_cont/restore_cont/mget/match
+and apprentice.c file_magicfind. Names are resolved across loaded
+databases in order. Continuations are copied, then file_check_mem resets
+hit flags (not offsets) at each entered level. Found-match and output
+return status are distinct, while separators are shared with callers.
+FILE_NAME descriptions are raw; NOSPACE and the 50-level name limit
+retain the reference behavior. Missing names and recursion errors use
+funcs.c file_error_core's current-buffer prefix and propagate through
+File/Buffer and text/indirect callers, rather than becoming a fallback.
+FILE_INDIRECT's counter follows FILE5_41 file_softmagic/mget: one shared
+total across loaded databases, nested indirects and named calls, not a
+depth counter. Valid nonzero offsets through EOF consume attempts even
+when no child matches. Binary and text passes, and separate requests,
+start fresh counters; every mget rejects a total of 50 or more.
+Continuation offsets follow FILE5_41 softmagic.c moffset/match:
+a failed top-level moffset flushes its continuations, retaining output
+and continuing with the next top-level group. A negative result is
+out of range. QWDATE/LEQWDATE/BEQWDATE use the reference's default
+continuation offset 0; their eight-byte value reads remain unchanged.
+ID3 indirect offsets follow FILE5_41 softmagic.c cvt_id3/cvt_flip/mget:
+only the primary offset is unpacked from four seven-bit groups before
+arithmetic. An indirect RHS keeps its raw value and ID3 types do not
+flip inside named calls. Direct ID3/varint conversion errors are now
+ported below; indirect ID3 offset decoding remains a separate path.
+DEFAULT/CLEAR descriptions follow FILE5_41 softmagic.c mprint's
+file_printf("%s", m->desc): both percent formats and query variables
+stay literal, while separators still use NOSPACE. MIME annotations
+retain their separate expansion behavior. Compiler-rejected percent
+descriptions are tested with explicitly patched temporary v16 fixtures.
+Regex matching follows FILE5_41 softmagic.c mcopy/magiccheck and funcs.c
+file_regcomp: byte/line regions retain the reference's LF-first search,
+8192-byte limit, final-byte replacement and NUL termination. Only the
+whole match is used, with leftmost-longest selection and REG_NEWLINE.
+ASCII-only case expansion preserves the C LC_CTYPE behavior for raw
+Latin-1 bytes and positive/negative classes. regexp/syntax retains GNU
+word/boundary escapes without enabling Unicode case folding.
+GNU quoting follows POSIX_EXTENDED as defined in glibc regex.h:
+backslashes inside classes are literal, unknown escapes outside classes
+quote a character, \s includes VT, and C-locale single-byte collating
+and equivalence elements retain their meaning. Buffer anchors and
+unmatched right parentheses follow GNU behavior.
+The escaped-lowercase REG_ICASE exception is verified against glibc
+tag glibc-2.35, posix/regcomp.c peek_token, and the actual FILE5_41 API:
+an unknown escaped lowercase byte stays raw while input is folded to
+uppercase. A no-match atom retains alternation/repetition semantics.
+Directional word anchors use regexp/syntax programs; valid \1 through \9
+backreferences use a forward reachable-state log and candidate cache,
+following glibc-2.35 regexec.c get_subexp/find_subexp_node/check_arrival.
+Duplicated captures share a group number, and the first reachable close
+node is selected even when another path would match under usual semantics.
+Ordinary patterns retain regexp's leftmost-longest engine (all 263
+published regex rules). Temporary markers preserve GNU group numbering.
+Initial nullable references follow regcomp.c create_initial_state,
+separately from runtime cache insertion. Forward halts are candidates:
+regexec.c prune_impossible_nodes/sift_states_backward validate them with
+recursive reference limits, inverse epsilon closures and earlier-halt
+fallback. Cached close nodes are reused as in get_subexp. Arrival checks
+retain check_arrival_expand_ecl_sub's boundary-sensitive edests traversal,
+including its difference from a cached consuming reference transition.
+Source contracts verify skipped/empty/repeated captures, raw bytes,
+ASCII-only folding and whole-match offsets against the reference.
+This is not full GNU ERE grammar/error parity: invalid compiled patterns
+still lose their line-numbered error, and other syntax is not yet complete.
+Pascal strings follow FILE5_41 apprentice.c file_pstring_get_length and
+softmagic.c mcopy/mconvert: decode from the zero-padded 128-byte union,
+clip to 128 minus prefix size, shift and write one terminating NUL.
+The remaining tail is not cleared. Includes-itself subtraction uses
+64-bit size_t wrap; only FILE_BADSIZE is rejected before clipping.
+Their long-output dependency follows softmagic.c mprint's 512-byte sbuf
+and funcs.c file_printable, with at most 511 printable bytes, never a
+partial octal escape. FILE_STRING conversion terminates byte 127.
+Search follows FILE5_41 softmagic.c mcopy/magiccheck/moffset/mprint:
+the plain memmem path includes a start at str_range, whereas the
+flagged comparison loop excludes it. Zero range means unbounded.
+Relations use the actual comparison, including signed/unsigned tests.
+Copying a region precedes extent checks and does not reset rm_len;
+printing retains the copied region, not the matched substring.
+Shared string comparison preserves required/optional whitespace
+precedence and accepts a NUL as the full-word terminator.
+File's EOF full-word behavior is deterministic because magic.c clears
+its SLOP bytes. The native Buffer comparator can read beyond the declared
+input length, making its result depend on adjacent allocation bytes.
+That boundary is diagnosed separately, not hidden by padding the oracle
+or emulated with unsafe Go reads. The scanner's File API is tested there.
+Runtime zero-range contracts patch only temporary v16 fixtures, since
+the source compiler rejects an explicit search/0 with its annotation.
+GNU ERE duplications follow glibc-2.35 posix/regcomp.c
+parse_expression/parse_dup_op/fetch_number, called by FILE5_41 file_regcomp:
+consecutive operators apply in order, {,n} starts at zero, and the
+per-operator count limit is RE_DUP_MAX (32767), not Go's parser limit.
+Temporary captures let Go parse atoms without copying original groups;
+removing those captures restores GNU marker/reference numbering before
+constructing repeat nodes. Valid counts rejected by regexp's parser use
+syntax programs directly; the 263 published regex rules remain standard.
+For programs without GNU markers, a known literal prefix excludes starts
+where that prefix cannot fit, without imposing an execution-step limit.
+Regex relations use the native 0/1 comparison for every relation, not
+only equality and inequality. A read past EOF clears the regex region
+and fails mget, retaining prior offset/rm_len for the caller; relation
+'!' is then handled by the common failed-read path.
+An additional native {0,32767} runtime stress probe was stopped after
+large reference-side memory growth; it is not counted as a passed
+runtime contract. Invalid-pattern error/line parity remains incomplete.
+Ignore-case brackets uppercase their literal bytes and single-byte
+collating/equivalence elements before constructing ranges, following
+glibc-2.35 regex_internal.c build_upper_buffer and regcomp.c
+parse_bracket_exp/parse_bracket_symbol. POSIX class names retain their
+original spelling. The resulting set is then expanded to accept both
+input cases: [A-z]/c means letters, not the punctuation between Z and a.
+The wider grammar audit's bounded-capture differences, including
+(A|AB){0,2}\1, are resolved by the forward port. GNU parse_dup_op's
+optional-before-last expansion preserves duplicated-node order instead
+of using Go's equivalent-language but differently ordered expansion.
+GNU alternatives are protected with removable temporary captures before
+Go parsing: factoring AB|A or merging A|B changes the nodes used by the
+native boundary and inverse-closure checks. Ordinary published rules keep
+their existing backend; no separate full regex compiler is introduced.
+Measured matrices and source contracts do not prove parity for all inputs.
+Native long-running probes are recorded separately, not counted as passed.
+Runtime errors for ranges made invalid by case folding and resource
+behavior remain in the error/performance-parity work.
+Numeric conversion also follows FILE5_41 softmagic.c cvt_float/cvt_double:
+cast the integer mask to the value's precision, perform only +, -, *, /,
+and keep the converted value's bits for printing. Zero masks and bitwise
+or inverse operations do not alter floating-point values.
+Indirect do_ops returns uint32_t before the parent-relative addition and
+bounds check; that addition also wraps at 32 bits. Source contracts cover
+wrapped valid offsets, a wrapped zero rejection and ordinary controls.
+The single-request value union follows softmagic.c mcopy/mconvert:
+16-bit strings copy through embedded NULs, preserve the unfilled tail,
+replace a zero low byte with space when the other byte is nonzero,
+and terminate byte 127. Numeric conversions update their host-endian
+union bytes without discarding the copied tail; search/regex/DER copy
+their separate search region without replacing this union.
+Named and indirect calls, loaded sets and the binary-to-text pass carry
+the union within a request. mprint/moffset write their CR/LF terminator
+back into it; funcs.c file_strtrim also writes a trailing terminator
+without moving the leading bytes or clearing the remaining tail.
+Native file_reset retains the union across requests. That behavior is
+not yet ported: shared-state/concurrency changes await user approval.
+Offset reads distinguish mcopy's uint32(offset+base) from mget's local
+bounds and indirect RHS position. Numeric conversion reads the padded
+union, including the quad/date types without FILE5_41 extent checks.
+Indirect target bounds are checked for the final type, not globally.
+Continuation ends narrow to int32_t; copied positions wrap at 32 bits.
+buffer.c buffer_fill requires a regular-file stat/fd: Buffer does not
+provide an end view. Named negative File offsets use match's current
+rule line, not necessarily the NAME header's compiled line; no database
+format or contents are changed. mprint's int32_t -1 return also propagates when
+magic_error is NULL, preserving the adapter's non-nil empty-message error.
+Endpoint contracts record error presence separately from error text.
+buffer_fill uses min(stat size, current buffer length) and preads raw file
+bytes, even when the front already contains the whole file or normalized
+text. ascmagic initializes a fresh buffer for its UTF-8 pass. FILE_INDIRECT
+copies the parent's buffer: an existing end view is inherited, but a first
+fill in the child must not fill the parent. Failed fills remain unavailable.
+These end views are request-local; the pending cross-request state and
+concurrency change is not included.
+mget keeps the original matching front separate from its selected read
+view. FILE_USE recurses on that original front (normalized text in the
+text pass), not on the current end view. Pointer copies, local bounds and
+FILE_INDIRECT slicing still use the selected read view. The parent's end
+offset and continuation view remain unchanged after the named call.
+magiccheck retains the compiled 64-bit comparison constant. Only the
+input is narrowed and, for signed types, sign-extended. DO_CVT tests the
+original mask before casting its operand to the input width; a nonzero
+mask cast to zero still performs AND/multiply or reports the line-numbered
+division/remainder error. Byte-order conversion remains in the value
+union even when that operation fails. String comparisons honor zero
+length and use the shared relation rules, including UNSIGNED and bit
+relations. GUID comparison orders the expected bytes before the input
+and applies the entry's signed/unsigned relation flag.
+FILE_OFFSET is an intrinsic position in mcopy, even for the primary copy
+of an indirect rule: it clears the union and sets q to the copied offset,
+not to bytes read from the file. mconvert then applies cvt_64 masks and
+inverse to q. The converted value is written back to the union without
+changing the rule's offset or its continuation position.
+The search region, offset and rm_len also live for the entire request.
+Named calls restore continuation levels and offsets; indirect output-buffer
+push/pop does not restore search state. Carry this state in and out of
+both calls, across loaded sets and into normalized text, even after an
+unprinted or unsuccessful child. Do not persist it on Database.
+FILE_INDIRECT does not save/restore the continuation array or eoffset.
+Pass both into the child and return its updates, including an expanded
+array or a zero-output result. Output-buffer pop restores offset only;
+the parent's selected buffer and tail view remain unchanged. match resets
+flags on entry to a level, not all continuation offsets after an unprinted
+top-level group. FILE_USE still isolates its levels and restores eoffset.
+match sets the active rule line after top-level msetoffset succeeds,
+but before checking continuation depth. A negative NAME header at a
+nonzero File base therefore reports the caller's active line. Carry that
+line through named/indirect calls, loaded sets and normalized text within
+the request. funcs.c file_error_core omits the label when the active line
+is zero and then retains any existing output prefix. Two temporary v16
+lineno-zero compiled fixtures test that boundary separately from the
+59 normal-source contracts; shipped databases are unchanged.
+Native file_reset retains the line across requests too; that shared-state
+and concurrency change is not included and still awaits explicit approval.
+FILE_BEID3/LEID3/BEVARINT/LEVARINT have names in apprentice.c but no
+direct case in FILE5_41 mconvert. After mcopy they report the active-line
+invalid-type error, even for a value copied beyond EOF. Do not decode
+them as supported direct scalar types. Reuse file_magerror's line/prefix
+semantics for these errors and negative NAME offsets. Retain mget's
+earlier indirect-pointer bounds and match's mode/MIME short circuits:
+set_test_type does not mark a standalone ID3 rule BINTEST, unlike varint.
+The 128 warning-free normal-source contracts are separate from 16 ID3
+numeric-value sources which abort the native compiler, and from eight
+temporary compiled lineno-zero controls. Shipped databases are unchanged.
+FILE5_41 magiccheck compiles a reached regex with REG_EXTENDED|REG_NEWLINE
+and optional REG_ICASE, then reports file_regerror through file_magerror.
+The source compiler's check does not include REG_ICASE: normally compiled
+case-folded ranges can still fail at runtime. Follow glibc 2.35 regcomp.c
+parse_reg_exp/parse_branch/parse_expression/parse_dup_op/fetch_number and
+parse_bracket_exp/parse_bracket_element/parse_bracket_symbol on raw C-locale
+bytes to retain native syntax codes, messages and first-error precedence.
+Do not infer native codes from Go parser errors or reject a loaded compiled
+database early. Non-nil empty search regions still compile; nil regions,
+unreached rules and MIME early returns bypass compilation. Abort match
+immediately after magiccheck fails, before another rule can overwrite the
+error or emit a successful result. The 42 normal-source contracts are
+separate from 52 temporary compiled-pattern/lineno controls and two
+compiler-rejected sources. No cross-request state or error cache is added.
+Allocation/regexec resource failures and failed-compilation caching remain
+outside this syntax-error closure; they are not claimed as ported here.
+FILE5_41 magiccheck routes BESTRING16/LESTRING16 through file_strncmp16,
+which explicitly sets its local flags argument to zero. Do not apply
+ordinary string case/whitespace/full-word modifiers to this comparison.
+Do not clear the stored str_flags: mprint still consumes STRING_TRIM and
+match still consumes text/binary mode flags. apprentice.c rejects all
+nonzero string16 source modifiers; the 116 nonzero compiled-field probes
+are therefore separate from 16 normally compiled zero-flags controls and
+12 rejected sources. The release databases contain 74 string16 records,
+all with zero flags; no database, copying or continuation rule is changed.
+FILE5_41 magiccheck handles float/double relations separately: only x, !,
+=, > and < are valid. Reached & or ^ rules report file_magerror's active
+line and the respective "cannot happen with float/double" message, then
+abort matching. apprentice.c accepts these relation sources without a
+warning; they must not become a normal no-match or a load-time failure.
+The 252 normal-source contracts cover both precisions and byte orders,
+MIME early returns, skipped and short reads, named/indirect calls, loaded
+sets and normalized text, with valid-relation controls. No compiled field,
+shared state, lock, conversion or floating-point formatting is changed.
+FILE5_41 magiccheck does not return an unconditional match for DEFAULT or
+CLEAR: it sets l and v to zero, then uses the common relation switch.
+The compiled value and copied union are ignored; NAME and INDIRECT still
+return true independently. Source-level non-x numeric controls abort the
+native compiler, so 86 temporary relation/value-field probes are separate
+from 12 normally compiled x controls and 12 rejected sources. Standalone
+top-level rules retain set_test_type's mode skip. Published control rules
+all use x; no database, output formatting or shared state is changed.
+FILE5_41 mconvert's default rejects type zero and every type above 52,
+not just the four named ID3/varint types which also lack direct cases.
+apprentice.c check_buffer validates the compiled layout and counts, not
+each type; preserve the runtime error after mcopy, even beyond EOF,
+instead of rejecting the database at load or returning a normal match.
+Retain v16 provenance on each private decoded entry so the v21-only
+MSDOS date/time and octal types (55..61) are not accepted as v16 rules.
+This does not change the on-disk layout, public API or shared state.
+The 299 contracts separate nine unchanged byte controls from 290
+temporary type/explicit-zero-line compiled-field probes. They include
+all 204 other unsupported v16 type bytes plus four earlier error controls,
+mode/MIME short circuits, EOF, named/flipped/indirect calls and text.
+Eight synthetic v21 Go preservation controls are not native 5.48 parity
+evidence. Published databases contain none of these unsupported types.
+FILE5_41 magiccheck's common relation switch reports file_magerror for
+every relation except x, !, =, >, <, & and ^. Carry the current request
+into rel instead of returning a normal no-match. Keep this check after
+string/search/regex work: NAME, USE, INDIRECT and DER do not use it,
+nil regex regions bypass it, and regex errors have earlier precedence.
+Its %c and the float/double error branches insert one raw C byte, not a
+Unicode rune; the public error string stops at NUL. Preserve both facts.
+The 950 four-interface contracts separate 48 unchanged-source controls
+from 902 temporary relation/explicit-zero-line compiled-field probes.
+The initial 768-case byte/float/double audit covers every relation byte.
+External comparisons use hex for raw result/error bytes; frozen Go
+strings use byte escapes. Do not normalize invalid UTF-8 through JSON.
+All published relation bytes are valid. Matching algorithms, loading,
+on-disk records, description formatting and shared state are unchanged.
+FILE5_41 DO_CVT tests the original integer mask before narrowing it.
+A nonzero mask whose narrow divisor becomes zero reports file_magerror's
+active line; line zero preserves any existing error-output prefix, without
+the literal "line 0". Route this error through the existing request helper,
+not the entry's stored lineno. An original zero mask still skips the
+operation; conversion order, inverse and short-read/MIME exits stay intact.
+apprentice.c parse_op_modifier narrows normal source masks with
+file_signextend, so overflowing source divisors compile to zero masks.
+The 202 contracts separate 60 unchanged /1 and %1 controls from 142
+temporary mask/explicit-zero-line compiled-field probes, including !,
+named/flipped/indirect calls, first-error precedence and skipped reads.
+Only temporary records change. Published databases contain no nonzero
+divisors that narrow to zero. No cross-request error/state claim is made.
+FILE5_41 mget has separate integer-operand switches for indirect offsets
+and their optional indirect RHS. They accept BYTE, SHORT, LONG, BESHORT,
+BELONG, LESHORT, LELONG, MELONG, LEQUAD, BEQUAD, BEID3 and LEID3 only.
+Other operand types return a normal no-match, not a conversion error.
+Do not reuse the direct DATE/LDATE aliases or host-endian QUAD here.
+apprentice.c also accepts e/f/g/E/F/G selectors but maps them to DOUBLE
+types which these runtime switches do not support; preserve that miss.
+The 598 four-interface contracts cover every operand-type byte in both
+roles, all 22 source selectors and named/flipped/indirect/relative/negated
+contexts. Forty-six source controls are unchanged; 552 temporary records
+change only in_type. Standalone top-level mode filtering stays intact.
+All 742 published indirect records use supported types; no database,
+loading rule, direct conversion, shared state or lock changes.
+FILE5_41 match checks ELSE/ELIF only after msetoffset and relative-offset
+setup. A skipped branch can therefore change the active end view, or
+flush the group when that setup fails. A non-negated short mget preserves
+last_match; a failed comparison clears it, while a failed read with !
+takes the match path. last_match is independent of printed output and
+got_match: a suppressed DEFAULT can still prevent ELSE, and CLEAR only
+clears got_match. Keep the entered-level reset after moffset failure.
+The 298 normal-source conditional contracts cover 47 programs in six
+contexts plus 16 normalized-text cases. They freeze errors and File/Buffer
+separately, including MIME returning before a later description error.
+All 345 compiled source databases are unchanged; existing generic test
+helpers are reused. The prior runtime already agrees, so this adds only
+regression coverage, not a runtime fix or a new condition evaluator.
+FILE5_41 file.h IS_STRING excludes type 61, although the newer v21 octal
+entry belongs to the string-mode family. skipByMode now respects the decoded
+entry version: v16 type 61 reaches mconvert's native invalid-type error
+instead of being hidden by string text/binary flags. The generic type family,
+v21 behavior, loading layout, and normal mode-flag selection are unchanged.
+102 frozen contracts cover six contexts and ASCII/binary input, including
+18 unchanged source controls and 84 temporary type/string-flag records.
+Four prior runtime differences (top-level and indirect sub-buffer) now agree
+with fresh file 5.41 decoders in all four endpoints, including error presence.
+The release databases contain no type 61, so no release output change is
+claimed. Independent checks cover every type byte and both decoded versions;
+the v21 checks preserve existing behavior, not native v21 acceptance.
+FILE5_41 apprentice.c file_pstring_length_size reports invalid length flags
+through file_error, not file_magerror. mget first checks the stored extent;
+mconvert then reports corrupt Pascal length flags after copying the union.
+copyValue now preserves that error and its existing output prefix without
+adding an active-line prefix. Valid length/J underflow stays an ordinary miss;
+short reads, skipped branches and MIME annotations that return earlier do not
+validate a rule which the native path has not converted. Validation is not
+moved into loading. 426 four-endpoint contracts include 75 unchanged source
+controls and 351 temporary string-flag records; 458 databases were independently
+recompiled. The prior 243 differing cases now agree, retaining 32 native
+File/Buffer differences. The release library's 45 Pascal records all have valid
+length flags; no release-output or dispatch change is claimed.
+FILE5_41 file.h stores cont_level in uint16_t; apprentice.c accepts normal
+source chains beyond level 255, and softmagic.c matches them without an 8-bit
+limit. Preserve that width in the private decoded entry instead of truncating
+v16 continuations into false top-level entries. The v21 one-byte level and
+independent two-byte flags remain unchanged; no database layout is changed.
+120 frozen normal-source four-endpoint contracts cover ten depths through 1024
+in twelve contexts. All 130 independently recompiled databases are unmodified;
+84 prior differences now agree, including errors and ten native File/Buffer
+differences. Exhaustive decoder checks preserve all 65536 v16 levels and v21
+flag combinations; those are decoder checks, not native v21 acceptance.
+The release databases reach only levels 15 and 18, so no release-output or
+dispatch change is claimed. Cross-request state and production entry points
+are unchanged; overall parity remains incomplete.
+FILE5_41 apprentice.c apprentice_map uses the existing two header counts to
+split ordinary rules from named rules. file_magicfind searches only set 1;
+file_softmagic scans the declared set 0. Preserve n0 in the private decoded
+set, bound the name index to set 1, and stop inferring a boundary from the first
+NAME record. No disk layout or public API changes. Synthetic test sets now
+state their ordinary counts explicitly; their prior assertions are unchanged.
+A continuation msetoffset failure goes to flush, bypassing the found-match
+return at group end. Continue the outer loop after skipping continuations,
+including when the preceding group already printed output. This dependency was
+exposed by two remaining tail/NAME cases after the header-only fix.
+138 four-endpoint contracts comprise 32 unmodified source databases and 106
+fixtures changing only existing header counts, with 160 source recompilations.
+The prior 70 differences, including three normal-source flush cases, now agree.
+All frozen compiled bytes are independently checked by the source compiler;
+File/Buffer outputs and errors remain separate. Non-native decoder checks also
+preserve existing v21 header partitioning, not native v21 acceptance. Both
+release headers equal the former inferred boundary; the flush behavior can
+still affect other inputs. Overall parity and production replacement remain
+unapproved, with cross-request and concurrency state unchanged.
+FILE5_41 softmagic.c mprint PRINTER first sign-extends the source value,
+then passes the declared scalar type through C variadic promotion. Interpret
+byte/short/long printf integer arguments as 32 bits and quad/offset as 64 bits;
+the directive, not UNSIGNED alone, selects signed or unsigned output.
+Preserve the original signed/unsigned decimal fallback for string directives.
+The expansion scanner also consumes the length modifiers already accepted
+by parseFormat, rather than leaking ll into the description. Native acceptance
+here covers ordinary quad ll directives, not every possible modifier.
+900 normal-source four-endpoint contracts, with 918 byte-exact recompilations,
+remove 354 prior differences. 789504 byte/short promotion checks and 144 frozen
+native long/quad outputs run without reference tools. This H subitem does not
+close printf validation/resource errors, numeric precision, float/date/character
+formatting, cross-request state, G/H overall parity, or production replacement.
+FILE5_41 funcs.c file_checkfmt/file_vprintf and softmagic.c mprint
+define the formatted-field and output errors. Port their normal accepted-source
+width/precision guard and per-call/aggregate output limits; clear the old buffer
+and preserve the specific error through emit. MIME annotations still return
+before description formatting. NAME/USE/INDIRECT and literal DEFAULT/CLEAR
+descriptions are not incorrectly treated as printf formats.
+Integer digit precision now suppresses width zero-padding, omits zero at zero
+precision except alternate octal, and excludes the sign from digit count.
+Hex width zero-padding follows the alternate prefix. The reference printf
+implementation inspected is glibc tag glibc-2.35, vfprintf-internal.c; its
+retained source hash and URL are recorded with the probes, not copied code.
+1814 normal-source contracts with 1826 byte-exact independent recompilations
+remove 610 prior differences. Four native description errors agree in text,
+bytes and presence; MIME succeeds in all four. Six empty zero-precision
+descriptions remain successful empty strings, including a separate continuation
+separator control. Another normal-source 1025-sibling probe proves the 1 MiB
+aggregate error and early MIME return, with an independently byte-equal database.
+1728 frozen scalar outputs and the boundary/aggregate guard unit tests execute
+without reference tools. These are finite precision/padding/error subitems:
+other flags/modifiers, float/date/character formatting, embedded-NUL output,
+the full printf backend, G/H overall parity and production remain unaccepted.
+FILE5_41 softmagic.c PRINTER and funcs.c file_vprintf/file_getbuffer
+distinguish raw printf bytes, C-string appending and the escaped successful
+result. A %c value is one byte, not Go's UTF-8 encoding of that byte as a rune;
+the inspected glibc-2.35 vfprintf-internal.c form_character confirms the cast.
+Preserve the visible prefix of formatted NUL output before subsequent rules
+append. At all four public result boundaries, escape successful non-printing
+bytes using the existing cgo wrapper's C locale; do not apply mprint's 511-byte
+limit or transform error results. This does not add locale or MAGIC_RAW APIs.
+1055 normal-source contracts with 1071 independently byte-equal database
+recompilations remove 537 prior differences. They include all 256 byte values
+for both signed and unsigned byte types, widths/precision, empty output,
+continuations, names, flips, cross-database/indirect paths and early MIME.
+244 string cases in six string handlers already agreed before the repair;
+the existing string width/precision code and bounded printable helper remain
+unchanged. Four description errors still agree while MIME returns early.
+Another ten normal-source character-to-error probes have byte-equal
+recompilations: six prior differences now agree, preserving raw error bytes.
+794 rejected initial proposals remain separate compiler evidence, not runtime
+coverage. apprentice.c check_format_type accepts %c only for FILE_BYTE and
+rejects numeric %s; 16-bit string source rules reject /b modifiers.
+668 frozen character outputs, 36 frozen string outputs and 512 raw character
+checks run without reference tools, alongside result/NUL/error unit controls.
+Only this finite normal-source subitem is accepted. Other flags/modifiers,
+fmtcheck fallback, float/date formatting, the entire printf backend and
+cross-request/concurrency behavior remain unaccepted; production still uses cgo.
+FILE5_41 print.c file_fmttime uses asctime_r with a 26-byte buffer after
+gmtime_r/localtime_r. The inspected glibc-2.35 time/asctime.c prints the
+calendar year with unpadded %d, not a four-digit minimum; years below -999
+or above 9999 cannot fit. Preserve *Invalid time* rather than printing
+Go's very large or zero-padded years. The implementation adds only this
+calendar-year formatting/buffer behavior, not glibc source code.
+906 accepted normal-source probes have 909 independent byte-equal database
+recompilations: 333 previous four-API differences now agree. 291 UTC source
+contracts are frozen in both test packages; the actual cgo test fails 123
+old contracts and passes all 291 after the repair. 615 local-date source
+probes cover UTC, Asia/Shanghai, America/New_York, Pacific/Kiritimati and
+Etc/GMT+12 in separate processes; eight description errors preserve early
+MIME success. Independent checks include 24 UTC scalars, 140 local
+zone/value outputs in isolated test processes, and a frozen glibc digest
+of 22006 year-boundary seconds. Production does not override time.Local.
+This closes only the finite ordinary date/ldate calendar subitem.
+Windows timestamps remain open: cdf_time.c uses signed ticks, approximate
+calendar conversion and local mktime, not a simple epoch subtraction.
+Its conversion is not changed here; neither arbitrary POSIX/right TZ
+semantics, all date conversions nor the entire printf backend is accepted.
+Windows date source audit (2026-10-26), not an implementation acceptance:
+FILE5_41 cdf_time.c converts signed int64 ticks through its approximate
+calendar, then calls local mktime with tm_isdst=0; print.c renders qwdate
+in UTC afterwards. Normal-source probes preserve the C truncating division
+and calendar quirks rather than substituting ideal FILETIME arithmetic.
+820 accepted, warning-free source cases across 13 zones have 823 independent
+byte-equal database recompilations. The current Go code still differs on
+657 cases; no runtime correction or new passing test is claimed.
+The inspected glibc-2.35 time/mktime.c retains localtime_offset across calls.
+18 fresh-handle File/Buffer A-B-A sequence queries, independently repeated
+in another process, prove this affects actual libmagic 5.41 results for
+unchanged bytes and database: Moscow differs by one hour and Pyongyang by
+30 minutes after different preceding timestamps; Kwajalein is a control.
+All corresponding MIME results agree. These use the installed native
+library, not a mocked reference or patched compiled database.
+The existing CDF summary formatter also reaches this calendar/mktime
+behavior, but its low-value elapsed-time branch is not qwdate semantics.
+Implementation of shared date state and necessary concurrency protection
+requires explicit confirmation; it has not been approved or introduced.
+120 Go files and production entry points remain unchanged in this audit.
+Normal-source floating-format subitem (2026-10-26):
+FILE5_41 softmagic.c mprint promotes float to double and uses %g as its
+default format. The existing finite %g path already had six-digit default
+precision; the earlier shortest-roundtrip audit claim is stale.
+apprentice.c accepts eEfFgG, but FILE5_41 fmtcheck.c only recognizes eEfg.
+With FILE_FMTDEBUG, public F/G produce file_magerror at softmagic.c 734
+(float) or 754 (double), before file_checkfmt field/output errors.
+Preserve that behavior only for v16; do not infer v21 format validation.
+For successful rendering, inspected glibc-2.35 printf_fp.c uses signed
+inf/nan or INF/NAN and space padding even with a zero flag. Port those
+observable cases, leaving existing finite rounding/conversion in place;
+no glibc implementation is copied and no floating environment API is added.
+831 warning-free normal-source contracts have 843 independent byte-equal
+database recompilations. All four APIs remove 544 previous differences;
+256 description errors (240 F/G) preserve early MIME success. The actual
+cgo suite fails 544 old cases and passes all 831 after the change.
+20 rejected proposals are compiler evidence, not runtime coverage.
+498 frozen scalar values and 204 fmtcheck errors execute without reference
+tools. A separately frozen libc snprintf digest checks 147960 formatter
+outputs in C locale/FE_TONEAREST, including raw printf F/G: those private
+checks do not override the public v16 F/G errors.
+General fmtcheck, unsupported source modifiers/flags, the whole printf
+backend, date/matching cross-request state, concurrency and replacement
+remain open. No date/shared state or production entry point is changed.
+General format-check subitem (2026-10-26):
+Translate FILE5_41 fmtcheck.c (NetBSD 1.8) with its original notice and
+the softmagic.c mprint/check_fmt/F callsites with their original notice.
+Use Linux/C-locale argument categories, not current libc printf's accepted
+syntax: h is promoted int, ll/q is quad, n is a distinct pointer type,
+star width/precision consumes arguments, and unused arguments are allowed.
+The v16 checker precedes file_checkfmt, preserving exact error bytes,
+source callsite, active/zero line behavior and early MIME success.
+Numeric check_fmt uses the original POSIX bracket semantics, including a
+literal backslash and non-skipped %%: render a raw number before applying
+the description's string width/precision. No shared regexp cache is added.
+Normal-source malformed precision and temporary compiled-field probes
+also exposed short-integer printf truncation, q consumption and DER output.
+For v16 DER tag/length-only matches preserve the existing value union;
+an explicit DER value match copies its text like strlcpy. mprint prints
+the union without DER string trimming, then applies printf precision.
+This is not acceptance of DER's remaining parser/read-boundary paths.
+Unlike mprint's no-op INDIRECT case, mget's successful INDIRECT prefix
+does call F(desc, "%u") at softmagic.c 1841, after child line updates.
+Validate that prefix and its per-call/cumulative output limits there.
+1160 contracts separate 51 warning-free normal sources from 1109
+temporary description/optional-zero-line fields. 1176 databases are
+independently recompiled and byte-checked; no header or release DB changes.
+All four APIs remove 825 previous differences; actual cgo changes from
+825 failures/335 passes to all 1160 passes. 746 description errors retain
+successful MIME results. Compiler rejections remain separate evidence.
+Offline checks cover 40922 frozen fmtcheck results (including 2048
+deterministic generated formats), POSIX check_fmt cases and 497 numeric
+value/error controls. This is not arbitrary-format printf acceptance:
+other flags/length rendering, all compiled fields and the full backend
+remain open. v21 fmtcheck rules, date/matching cross-request state,
+concurrency, integration and production replacement remain unapproved
+or unverified as separately documented. No shared-state/lock/entry-point change.
+Signed/alternate formatting subitem (2026-10-26):
+Inspect FILE5_41 apprentice.c/fmtcheck.c/softmagic.c/funcs.c and the retained
+glibc-2.35 vfprintf-internal.c/printf_fp.c. Signed d/i and floating conversions
+honor plus over space, even for integer precision-zero empty digits; unsigned
+conversions ignore those flags. Zero padding follows the sign, while left
+alignment and special floating values keep their existing behavior.
+Alternate e/f/g rendering retains decimal points/trailing zeroes. Preserve
+glibc-2.35's %g carry from fixed to exponent notation: the pre-rounding
+minimum fraction count is retained, e.g. float bits 4479fffe with %#.3g
+renders 1.e+03 rather than Go's 1.00e+03. This is an observable adaptation,
+not copied glibc code or acceptance of other libc/locale/rounding modes.
+1660 proposals separate 54 compiler rejections from 1606 runtime contracts:
+16 warning-free normal sources and 1590 temporary description fields.
+1624 databases are independently recompiled and byte-checked; no header,
+type, relation or release DB changes. All four API values, raw errors and
+error presence remove 706 old differences. 227 description errors retain
+successful MIME results; public F/G and apostrophe errors are unchanged.
+The first 1542-contract public matrix agreed but a stronger independent
+raw printf digest exposed the carry difference; preserve that failure,
+repair it, then add 64 public contracts and a dense transition digest.
+1456 offline value/error controls, 181104 raw snprintf outputs and 27680
+signed IEEE neighbors around all finite positive decimal powers agree.
+Raw F/G checks validate the private formatter, not public v16 acceptance.
+Only this finite C-locale/FE_TONEAREST FILE5_41/glibc-2.35 subitem is accepted.
+Other length combinations, arbitrary compiled fields, the entire printf
+backend, v21 native rules, Windows date/shared matching state, concurrency,
+integration/resource gates and production replacement remain open.
+No shared-state, locking or production-entry changes are introduced.
+DER parser/data subitem (2026-10-26):
+Re-read complete FILE5_41 der.c and its softmagic mcopy/magiccheck/moffset/
+mprint callsites. Retain the original Christos Zoulas notice in der.go.
+Preserve the old implementation's behavior, not ideal ASN.1/BER semantics:
+getlength rejects p+digits >= length even for short form; zero long-form
+digits can succeed; all declared length digits accumulate in 64-bit size_t,
+including wrap, before UINT32_MAX-p and remaining-buffer checks.
+gettag's existing omission of the final low tag byte is not corrected;
+a wrapped DER_BAD tag remains a failure. Decimal pattern lengths wrap in
+64-bit size_t, not uint32. der_data uses a 128-byte buffer: string data
+has at most 127 visible bytes and hex data at most 126 characters. Empty
+hex conversion retains the tag name already seeded into the same buffer.
+UTC-time %c inserts raw bytes and its visible string stops at NUL.
+DER mcopy replaces only the region/offset and retains rm_len. Eight
+actual native regex-to-DER-to-negated-search sequences exposed the
+previous per-request reset; this is not cross-request shared state.
+314 warning-free normal-source contracts have 322 independently
+byte-equal database recompilations, without fields or header patches.
+All four API values, raw errors and error presence remove 159 previous
+differences. Two description format errors preserve MIME success.
+The initial 306-case matrix removed 151 differences but did not cover
+the eight search-state sequences; its full test run was deliberately
+stopped, not accepted, before the final 314-case run from a new directory.
+Independent unmodified C function bodies freeze 9216 tag parses, 136696
+length parses and 7680 data outputs; failure cursors and DER_BAD are
+included. Four offline tests also cover region-copy field preservation.
+The earlier audit's 85 01 00 00 00 05 example already failed in the old Go
+code; it is not counted as a repair. Old Go already capped output at 128
+and stopped text at NUL; the actual native limits differ as stated above.
+Before entering this subitem, 273 length-modifier API checks agreed:
+one normal source, 272 temporary fields and 41 separate compiler rejects.
+Do not implement modern printf lengths that FILE5_41 fmtcheck rejects.
+Only this source-grounded DER subitem is accepted. Other I load/read/path
+items, v21 native rules, date/matching cross-request state, concurrency,
+integration/CI/resource gates and production replacement remain open.
+No shared state, lock, database layout or production entry is changed.
+The rest of the parity work is incomplete; see docs/libmagic-parity.md
+at the repository root for measured acceptance status.
+
+Release databases shipped with the scanner are file 5.41 compiled magic:
+VERSIONNO 16, FILE_MAGICSIZE 376. Their first word is cont_level, then an
+8-bit flag. OpenDatabase accepts that layout as well as version 21. A directory
+argument loads only compiled *.mgc files in that directory, in name order.
+
+Compiled path lists (2026-10-26) follow FILE5_41 file.h PATHSEP,
+apprentice.c file_apprentice (681-758), apprentice_1 (440-480),
+apprentice_map/check_buffer (3112-3240), and mkdbname (3304-3345).
+The apprentice.c copyright/license is retained at the start of magic.go.
+Linux splits every colon, stops on the first empty component, tries the
+preceding components in order, and keeps successful compiled databases
+even when another component fails. Non-suffixed paths use .mgc; bare
+partial suffixes c/gc/mgc retain the old .mgc lookup. The first observed
+bad-magic diagnostic is retained if no compiled database loads.
+The existing Go-only Windows drive/colon-list parser remains available;
+this does not claim native Windows semicolon-list parity. Compiled-only
+directories, source parsing, .mime/default lookup, and other loader errors
+are not closed by these changes. OpenBytes still has its own Go errors.
+Ordinary-file prefix reads (2026-10-26) follow FILE5_41 magic.c
+file_or_fd (500-514): one read with bytes_max, not ReadFull or a buffer
+capped by the earlier stat size. file_read.go retains the original
+magic.c notice. This concerns the prefix, not subsequent fd-based reads.
+41 scripted-reader cases check the unmodified C branch with only its
+read binding replaced: 33 previous helper failures now agree. Five
+early native errno cases are checked separately; the Go helper checks
+propagated error identity, not public errno-to-message conversion.
+36 successful prefixes have 72
+frozen native Buffer results. This is not Go File kernel fault injection.
+26 ordinary files independently check all four APIs, including the
+1 MiB boundary and fd-only tail rules, using a normally compiled,
+independently byte-equal database without field or header mutations.
+Removing ReadFull exposed a necessary CDF dependency. readcdf.c
+file_trycdf (541-562) passes both prefix and fd; cdf.c cdf_read/header
+(353-385) falls back to pread for a header absent from the prefix.
+cdfDescription now obtains that header from its per-request ReaderAt.
+funcs.c (334-340) still returns early for zero/one-byte prefixes.
+15 isolated native read-budget cases preserve pread and freeze File
+and Buffer values, raw errors and error presence. Go checks the prefix
+plus downstream classifier with both memory and actual file ReaderAt,
+and Buffer controls: 10 old CDF prefix failures now agree. The native
+hook is test-only and loaded only in reference child processes.
+Real ordinary-file strace confirms the 1 MiB prefix request, but also
+shows Go ReaderAt can issue an additional pread after a short pread.
+Do not infer identical raw syscalls, signal/retry semantics or all I/O
+errors. Open-fd fstat versus initial stat, changing files, remaining
+loader/default/NUL behavior, shared state/concurrency, integration/CI
+and resource gates remain open. Production entry points are unchanged.
+
+Opened regular-file status (2026-10-26) follows magic.c (470-476,
+518) and buffer.c buffer_init (39-53). Obtain descriptor status before
+the prefix read. If that status failed and the read succeeded, retry
+when entering the buffer classifier; two status failures mean zero
+mode/size, not the earlier pathname status. Preserve the permission
+description already emitted by fsmagic. Later ELF dynamic flags still
+override the execute fallback; this is not a new permission-based PIE rule.
+Remove the pathProbe.info field made unused by this change.
+72 actual opened-inode transitions use synthetic ELF32/ELF64,
+ET_REL/ET_DYN without PT_DYNAMIC, mode changes and grow/shrink controls.
+The reference child mutates only the opened inode through an open hook.
+A test-only Go opener overlay makes the same mutation without mocking
+probePath, Stat, reads, classification or returned values/errors.
+All four public APIs remove 80 value differences in 56 old cases;
+the same cgo test changes from 56 failures/16 passes to 72 passes.
+144 physical inode states per implementation confirm each File/MIME
+mutation; Buffer uses the original bytes as a separate control.
+32 unmodified C segment/body probes freeze stat/read/retry order and
+metadata, including error propagation and two failed statuses. Their
+portable Go tests use scripted Stat/Read callbacks, not kernel failure
+injection or public errno-message verification. Another 72 offline
+tests compose the actual helper/classifier with frozen Linux metadata.
+Real unmodified production-API strace shows the added descriptor status
+before each prefix read. Remaining internal fstat/read/pread retries,
+type changes, CDF/ELF size/read bounds, loading/shared-state/integration
+and resource gates are not accepted by this finite status subitem.
+
+CDF size-independent reads (2026-10-26) follow cdf.c:353-375 and
+readcdf.c:541-562. cdf_info_t supplies an fd, prefix and prefix length,
+not a stat size. A complete prefix range wins; otherwise pread the same
+fd. Remove the extra earlier-stat-size rejection, its field and argument;
+the existing test callers change only that removed argument. No CDF
+sector, chain, property or ELF parser is otherwise changed.
+72 four-API contracts use 12 existing synthetic compound fixtures, each
+with initial size 0, 1, 128, 512, full or full+512. A reference-only
+libc read hook changes the same inode after fstat but before prefix read;
+a test-only Go read-seam overlay performs the same filesystem change,
+without replacing status, read results, classifiers or outputs.
+The same unit/cgo tests change from 33 failures/39 passes to 72 passes:
+57 old value differences (description33, MIME24, Buffer0) disappear.
+There are 144 physical size/hash/hook checks per implementation:
+120 actual changes and 24 empty-file no-hook controls, not 144 changes.
+The Go fixture export matches independent native values and input hashes.
+One controlled far-sector trace has two size512 fd statuses and two
+1MiB prefix reads in each implementation; old Go performs no sector
+preads, new Go and native each perform the same 50 successful preads.
+This is controlled-mutation evidence, not uninstrumented production
+execution or proof of all signal/error/retry behavior.
+ELF size/prefix caching, other CDF reads, internal pread retry/errno,
+loading, date/shared-state, integration and resource gates remain open.
+Production entry points and shared-state/concurrency behavior are unchanged.
+
+ELF descriptor rereads (2026-10-26) follow FILE5_41 readelf.c:378,402,
+1372,1390,1404,1451,1669,1715. ELF headers still come from the original
+prefix as in elfclass.h; later structures are reread through the same
+request's ReaderAt, without reusing the prefix or clipping by old stat
+size. Keep the caller-specific native size guards and DT_FLAGS_1 logic.
+Remove the now-unused elfScan.data field. Two ELF64 SHT_NOTE wrap
+contracts reach native malloc failure; sizes above Go's signed allocation
+range return that observed note ENOMEM instead of panicking in make.
+This does not align arbitrary low-memory or large-allocation behavior.
+106 frozen contracts: ELF32/64, both byte orders, 0644/0755, program and
+section headers/data, names, notes, core notes, capabilities, growth,
+shrinkage, unchanged bytes and two note allocation errors. The same
+unit/cgo tests change from 98 failures/8 passes to 106 passes; 130 old
+four-API result differences disappear (File98, MIME32, Buffer0).
+Reference-only prefix-read hooks and a test-only Go read-seam overlay
+make real same-inode changes. Each implementation checks 212 resulting
+size/hash/hook states: 192 effective byte changes and 20 same-byte writes.
+No stat, returned prefix, ReaderAt response or classifier result is mocked.
+The separate offline test composes the classifier with actual byte readers;
+it is not Windows-native File parity or public File failure injection.
+Seven controlled trace cases have 14 real prefix reads each. New Go has
+22 ELF preads; native has the same 21 triples plus one capability
+lseek/read instead of Go's pread. Separately, softmagic tail preads count
+old12/new11/native14, with differing size/short-read contracts. Native
+continues softmagic after ELF error (funcs.c:416-445), unlike Go's early
+return. These differences remain open; not all syscall behavior matches.
+Initial trace interpretations (unfinished syscalls and tail classification)
+are retained as failed checks, not acceptance. Production entry points,
+published databases and shared-state/concurrency behavior are unchanged.
+ELF stat-zero retry, tail fd/stat/short-read behavior, internal retry/errno,
+loading, date/shared-state, integration and resource gates remain open.
+
+Tail fd/status snapshots (2026-10-27) port FILE5_41 buffer.c:39-88 and
+ascmagic.c:153-161. Keep the opened ReaderAt and its earlier regular-file
+status/size in the request-local tail. Do not reopen/stat the pathname.
+Text normalization starts a fresh cache with that same fd/status; existing
+named/indirect cache propagation stays unchanged. Remove the now-unused
+state.path and private path parameters. Nine old tests change only their
+metadata setup/private call arguments; original data/assertions are intact.
+file_tail.go and the unchanged C buffer probe retain the 2017 license.
+buffer_fill uses min((size_t)old_size, front_length), accepts a successful
+short read without reducing the window, caches nonzero windows and failure,
+but retries a successful zero-length window. Go EOF is not a tail failure.
+71 actual four-API contracts use seven normal source fragments compiled
+twice identically without warnings or .mgc field/header modifications.
+Old public Go fails 55/71 cases; new Go passes all: description55/MIME29,
+84 value differences gone, Buffer0. Each side checks 142 physical states:
+46 changed same-inode writes, 24 same-byte writes, 24 replacements,
+24 name removals by rename and 24 real descriptor closes.
+64 unchanged-C function contracts (192 fills) separately check supplied
+status, size_t comparison, full/short/error/zero reads and cache behavior.
+They are scripted read contracts, not public File kernel injection.
+The first complete gate passed two-fill tests but was superseded when
+a third fill exposed six stale-empty-buffer failure-cache mismatches.
+Clear the previous window before an uncached fill; the same64 three-fill
+tests then pass. Preserve the first gate and failing reproduction;
+Refreeze and verify all stages again. Preserve the cgo package's failed
+25-minute attempt in TestFormatCheckParity (root cause not established).
+That same frozen source's successful pure-Go log is reused byte for byte;
+retry the entire cgo package unfiltered with the same -count=1/-timeout=25m
+and all following check.sh build/corpus commands in a new directory.
+Seven controlled traces separate CDF-header reads from tail reads:
+old/new/native tail preads14/18/16, CDF preads24/24/12. New tail uses the
+original fd/status/window; two tail and twelve CDF Go ReadAt EOF retries
+remain. Native C short-read bytes not supplied by pread are uninitialized;
+Go's allocation is zeroed. No equality is claimed for inspecting that region,
+or for arbitrary allocation failure, signals/retries and errno.
+The rejected offset printf source, two stuck WSL tracers and initial
+CDF-vs-tail trace interpretation failure are retained, not acceptance.
+Each own tracer was stopped only after exact PID/cmd and terminal single-
+thread zombie child/complete JSON verification. The first environment
+workaround passed once but hung again after the third-fill correction.
+Final test-only main pins its OS thread and uses strace without -f, with
+GOMAXPROCS1/asyncpreemptoff. Removing only that import/affinity call restores
+the normal API harness byte for byte; results match the normal API and C.
+Ten native trace copies are separately byte/hash verified. Reused old trace
+names were not Windows-visible despite native copy checks; preserve this
+observation without asserting a cause, use previously unused final3 names.
+Production entry points/databases and shared-state/concurrency are unchanged.
+ELF error continuation/stat-zero/capability reads, remaining I loading/errno,
+H dates/state and J/K/L still prevent production replacement.
+
+Linux single-pread port (2026-10-27; finite I subitem, FILE5_41).
+Primary buffer.c:78, cdf.c:353-375 and readelf.c call pread once;
+positive short/zero returns are not filled, EINTR is not retried there.
+Route four CDF/ELF/tail callsites to readMagicAt. Linux real *os.File
+uses SyscallConn.RawControl with one syscall.Pread; retain the existing
+fd reference lifetime without new shared state, locks or polling.
+Normalize negative error count to zero; map closed RawControl acquisition
+to EBADF, matching observed libc pread. Go1.18.1 RawControl/FD.incref
+primary source was checked: its only failure is a closing descriptor.
+Non-Linux and non-file ReaderAt preserve their previous ReadAt behavior;
+no non-Linux single-pread parity is claimed. Prefix Read is unchanged.
+Two normal sources compile twice independently (four identical databases,
+no warning/field mutation). Three real samples and 12 four-API groups
+cover base/EINTR/EAGAIN/EIO. Old 3 fail/9 pass, new12 pass; 6 old values
+(File3/MIME3, Buffer0) disappear. Each implementation checks sample hashes
+24 times. Ten direct libc pread cases and 18 Go reader/raw-file cases pass.
+The x86-64 owned-child ptrace test substitutes only a target pread error
+via SETREGS, never positive byte counts, data or classification. It is
+controlled syscall-boundary fault injection, not natural signal delivery.
+The actual public Go and native API values and target pread events match.
+Only test main pins its OS thread; production threading is unchanged.
+Preserve rejected strace POKEUSER and PTRACE_O_EXITKILL environment paths
+as failures, not acceptance. Final controller uses supported TRACESYSGOOD
+and an own-child parent-death signal. Preserve initial closed-file 2/10
+raw Go failures: poll.ErrFileClosing was not os.ErrClosed. Simplify the
+lifecycle-error mapping to EBADF; refreeze, rebuild and retest final code.
+Seven real shrink/growth/rename actions have no fake read returns: old/new/
+native CDF preads24/12/12 and tail18/16/16, removing14 extra EOF reads.
+All public outputs/physical states remain equal. This does not equate
+C's uninitialized unread tail bytes with Go's zeroed allocation.
+Full unfiltered count1/25-minute package gates pass: ok  	asky/libmagic	871.465s;
+ok  	asky/libmagic/cmpcgo	928.664s. Fixed772 and historical3399 six fields all true.
+Windows SDK-only CGO0 package passes; Linux raw tests are excluded and
+11926 direct plus2766 child native checks skip there. ARM64 only compiles.
+Production entries, release databases and shared/concurrent state remain
+unchanged. ELF stat-zero/error continuation/capability seek-read, prefix
+Read/stat retries, other errno/signals/OOM, loading/NUL, H dates/state,
+and J/K/L still prevent production replacement. H sharing/concurrency
+still requires explicit approval; production remains cgo.
+
+
+## FILE5_41 ordinary prefix read: one raw read
+
+For the ordinary non-pipe path in `magic.c:500-514`, FILE5_41 issues one raw `read(fd, buf, bytes_max)` call. The pure-Go implementation now preserves that boundary for Linux real `*os.File` values by using `SyscallConn.RawControl` plus one `syscall.Read`. Custom `io.Reader` values and non-Linux builds retain the existing `Reader.Read` path.
+
+The syscall result normalizes a negative byte count to zero before slicing the buffer. A `RawControl` failure is reported as `EBADF`, matching the closed-file error class required by the focused comparison. No retry loop, synthetic bytes, classification, or production entry-point change was introduced.
+
+Focused ptrace SETREGS faults at offsets 0, 4, 11, and 5 matched native FILE5_41 and Go API behavior for short and long samples. The strict 772-path gate remained 100% equal across description, MIME, dispatch signature, auxiliary checks, and error text. Production remains cgo while the remaining I/H/J/K/L work is open.
+
+
+## FILE5_41 default magic path and C-string path boundaries
+
+The FILE5_41 `magic_getpath` behavior used by `magic_load(NULL)` is now represented in the compatibility adapter: an explicit `MAGIC` environment value wins; on Unix the loader checks `$HOME/.magic.mgc`, then `$HOME/.magic` or `$HOME/.magic/magic.mgc`, and appends the compiled system path `/etc/magic` as the native fallback chain. Windows keeps a small explicit fallback (`magic.mgc`) and is not claimed as native Windows default-path parity.
+
+File names and compiled database paths now stop at the first NUL before reaching Go filesystem calls, matching the C-string boundary used by `magic_file`, `magic_load`, and the compatibility wrapper. `Open("")` uses the default-path route; a non-empty Go string that becomes empty only after NUL truncation remains an explicit empty path and does not silently become the default route. The `.mime` compatibility lookup, source-directory parsing, and remaining loader errors are still open.
+FILE5_41 ELF capability seek/read and unknown-size bounds (2026-10-31; finite I subitem).
+The SHT_SUNW_cap path in readelf.c:1487-1505 is now represented separately
+from the ELF pread path: a real Go *os.File seeks to the section offset and
+performs one Read for each capability record; section/program/name/note reads
+remain pread. The pure-Go fallback for synthetic ReaderAt inputs remains
+non-mutating because those inputs do not expose a descriptor position. Short
+capability reads preserve the EINVAL left by the preceding CDF probe in the
+FILE5_41 reference; a real seek/read errno is formatted as error seeking or
+error reading instead of being collapsed to Invalid argument.
+
+The Go parser now treats a zero stat size on a non-regular source as
+FILE5_41 SIZE_UNKNOWN for section, note and core-program bounds. A regular
+source still retains its stat size; the separate fstat-failure/error path is
+not claimed complete. The note parser also follows donote's aligned return
+when a note name extends beyond the loaded block, rather than silently
+changing the next-note cursor. Pure-Go ELF regression tests cover the actual
+file-position change after capability parsing and unknown-size far section
+bounds. Native FILE5_41 cgo and full-package gates were not rerun in this
+subitem; production remains cgo.
+FILE5_41 ELF zero-stat fstat failure propagation (2026-10-31; finite I subitem).
+The opened-file status helper now retains the result of the post-prefix Stat
+retry instead of discarding it. A first status failure followed by a successful
+retry continues with the new descriptor status. If both status calls fail,
+non-ELF classification keeps the zero buffer status, while an ELF path enters
+file_tryelf's equivalent bad-read result before parsing structures. This
+matches magic.c's file_or_fd/buffer_init/readelf.c sequence and preserves the
+errno text supplied by the failed second status call. The existing public
+readMagicFile wrapper keeps its previous three-result contract; only the
+internal classifier path consumes the additional status error.
+
+Pure-Go tests cover the ELF error text and retain the existing normal and
+second-retry status-flow checks. Native FILE5_41 cgo and full package gates
+were not rerun in this subitem; production remains cgo.
+FILE5_41 MIME database sidecar selection (2026-10-31; finite loader subitem).
+The apprentice.c mkdbname compatibility branch was read and represented for
+the package adapter: the description handle loads the requested compiled path,
+while the MIME handle first uses an accessible sibling named
+<base>.mime.mgc (or replaces a trailing .mgc with .mime.mgc), then falls back
+to the requested .mgc/path. A path already containing .mime is not rewritten.
+The selection is made per colon-list component, preserving the existing
+first-empty-component and any-valid-database behavior. The public
+OpenDatabase API remains the description/default path and does not silently
+select MIME sidecars.
+
+A pure-Go test mutates only the v16 MIME fields in a copied database and
+verifies that the two compatibility handles select different files. Native
+FILE5_41 cgo and full-package gates were not rerun in this loader subitem;
+production remains cgo.
+MIME sidecar correction (2026-10-31).
+The preceding sidecar experiment was rejected after re-reading the actual
+FILE5_41 magic.h flags and the repository's magicmime.Open call: the MIME
+compatibility handle requests MAGIC_MIME_TYPE|MAGIC_SYMLINK|MAGIC_ERROR, not
+MAGIC_MIME (which additionally requires MAGIC_MIME_ENCODING). Therefore
+apprentice.c's `ms->flags & MAGIC_MIME` .mime sidecar branch is not active for
+the production compatibility handle. The temporary sidecar code and test
+were removed; no sidecar behavior is claimed or retained.
+
+## 2026-10-31: ELF zero-size retry includes FILE5_41 file_tryelf fstat
+
+After the post-prefix buffer status retry, the internal classifier now models the additional FILE5_41 `readelf.c:file_tryelf` fstat whenever the ELF buffer snapshot still has zero size. A successful retry replaces the zero size, regular-file flag, and execute mode; a failed retry preserves the zero status and reaches the existing ELF bad-read result. The accepted ELF magic check is centralized so `ELFMAG1` and `OLFMAG1` follow the same branch.
+
+This is a finite internal ELF status subitem. It does not change public entry files, production cgo selection, shared cross-request state, or concurrency behavior.
+
+## 2026-10-31: FILE5_41 compiled-buffer validation errors
+
+`OpenBytes` now preserves the FILE5_41 `apprentice.c:check_buffer` error classes for bad magic, unsupported versions, non-multiple database sizes, and inconsistent entry counts. Valid v16/v21 database decoding is unchanged; the change only replaces the previous generic Go validation text. This closes the in-memory compiled-buffer validation subitem without adding source-magic compilation or changing production scanner entry points.
+
+## 2026-10-31: FILE5_41 named compiled-database loader errors
+
+`OpenDatabase` now keeps the compiled-file name in the `check_buffer` diagnostics instead of exposing the in-memory `buffer` label. It also rejects a path-backed database smaller than the FILE5_41 `apprentice_map` minimum with `file \`...\` is too small`, while preserving the first loader error and allowing a later valid colon-list component to load. Unavailable paths remain skippable candidates, matching the loader's any-valid-database behavior.
+
+The path loader tests cover named bad-magic, version, size, entry-count, short-file, and invalid-then-valid fallback cases. This is limited to compiled database path diagnostics; source magic compilation, source-directory loading, and read-error injection remain open.
+FILE5_41 ELF error continuation after file_tryelf (2026-10-31; finite I subitem).
+When ELF supplementation records an error, the internal Go classifier now keeps
+that first error pending, suppresses the failed ELF suffix, and still runs the
+softmagic and text checks before returning the error. This follows funcs.c:416-495:
+file_tryelf can fail, file_softmagic/file_ascmagic still run, and the first
+file_error_core error wins at cleanup. A regression fixture confirms a tail
+softmagic read still occurs after a deliberate ELF note allocation failure.
+Pure-Go focused tests and vet passed; native cgo/full gates were not rerun
+because WSL remains unresponsive. Production remains cgo.
+
+FILE5_41 compiled-database open error propagation (2026-10-31; finite loader subitem).
+The path loader now skips only missing compiled candidates. Other open failures
+retain the source-loader error class `cannot read magic file \`...\' (...)` instead
+of being silently converted into the generic no-valid-database result. A later
+valid colon-list component remains eligible. Pure-Go loader tests and vet passed;
+native cgo/full gates remain open, and source magic compilation/source-directory
+parsing are not claimed.
+
+FILE5_41 is_tar.c checksum whitespace (2026-10-31; finite subitem).
+`from_oct` now uses the C-locale whitespace set for leading padding and the
+post-digit terminator, matching is_tar.c rather than accepting only space/tab.
+The focused test covers all six C whitespace bytes and rejects 0xa0. Pure-Go
+tests and vet passed; native cgo/full gates remain open.
+
+FILE5_41 compiled-directory hidden entries (2026-10-31; finite loader subitem).
+Directory loading now skips dot-prefixed entries before selecting compiled
+regular files, matching apprentice.c. A hidden invalid `.mgc` no longer blocks
+a visible valid database. Pure-Go tests and vet passed; source-directory parsing
+and native cgo/full gates remain open.
+
+FILE5_41 compiled-directory regular-file filtering (2026-10-31; finite subitem).
+Visible directory candidates are now stat'ed and only regular files are loaded,
+following symlinks to regular targets and excluding FIFOs/devices before open.
+This matches apprentice.c:1424. Pure-Go tests and vet passed; native gates and
+source magic parsing remain open.
+
+Linux FIFO directory-loader regression (2026-10-31; verification subitem).
+A Linux-only test now creates a `.mgc` FIFO beside a valid database and checks
+that openDir skips it before opening. Windows tests and vet passed; the Linux
+runtime test remains pending because WSL is unresponsive.
+
+FILE5_41 Windows timestamp conversion (2026-10-31).
+The pure-Go port now follows cdf_time.c's signed int64 tick path: C-style
+truncating division, the approximate 1601-based year, cdf_getdays,
+cdf_getday, and cdf_getmonth are kept before local mktime conversion. The
+QWDATE/LEQWDATE/BEQWDATE formatter uses the same conversion and renders the
+result through UTC, matching print.c; CDF summary timestamps reuse the
+conversion and retain their local ctime rendering. The mktime inversion follows
+the inspected glibc-2.35 __mktime_internal probe order, including the previous
+localtime_offset guess, the six-probe limit, and standard-time correction around
+DST. The offset is process-global and protected by one mutex because glibc's
+reference state is process-global; this is the only new shared state in this
+subitem.
+
+Pure-Go checks cover the FILE5_41 calendar sample in UTC, the standard-time
+request in America/New_York, negative signed ticks through QWDATE, and the
+existing CDF summary cases. The native multi-zone cgo/state replay and complete
+package gate remain required before production replacement; the current WSL
+reference command is unresponsive and is not represented as a pass.
+State replay verification addendum (2026-10-31): the pure-Go regression now
+replays the saved native FILE5_41 sequences for Europe/Moscow,
+Asia/Pyongyang, and Pacific/Kwajalein. It constructs the same signed CDF ticks
+from the saved UTC inputs and checks prime/target/prime/target output, including
+Moscow's one-hour and Pyongyang's thirty-minute state-dependent target changes
+and Kwajalein's unchanged control. This is a source/evidence replay, not a new
+native run; the saved native JSON remains the oracle.
+
+FILE5_41 apprentice source loading (2026-10-31; finite loader/parser subitem).
+The pure-Go loader now falls back from a missing or invalid compiled sidecar to
+a regular source magic file. Source-only directories load visible regular
+fragments in name order; a directory containing compiled `.mgc` files retains
+the repository's compiled-directory contract and ignores non-`.mgc` companions.
+The source parser follows the inspected `apprentice.c` line shape for
+continuation levels, offsets and indirect offsets, conditions, numeric and
+string relations, C escapes, string modifiers, `!:mime`, `!:strength`, and
+`name`/`use` groups. Parsed groups receive FILE5_41 binary/text classification
+and strength ordering before matching; signed numeric constants are sign
+extended to their source type width.
+
+Pure-Go tests cover a source file, a source-only directory, escaped strings,
+numeric masks, MIME output, and name/use continuation matching. This is not a
+claim that every FILE5_41 source grammar or compiler diagnostic is complete:
+source compilation to `.mgc`, all legacy aliases/directives, and mixed
+compiled/source directory parity remain open. Native cgo and full corpus gates
+were not rerun because WSL is unresponsive.
+
+FILE5_41 standard source type aliases (2026-10-31; finite parser subitem).
+The source parser now accepts the `apprentice.c:get_standard_integer_type`
+forms `d`/`u`, `dC`/`uC`, `dS`/`uS`, `dI`/`uI`, `dL`/`uL`,
+`dQ`/`uQ`, the numeric aliases `d1`/`u1`, `d2`/`u2`, `d4`/`u4`,
+`d8`/`u8`, and the SUS `s` string alias. The existing keyword path remains
+first, so `string`, `search`, `use`, and unsigned keyword types retain their
+previous parsing.
+
+Pure-Go parser tests cover every alias and its signed/unsigned flag. This
+closes only the standard integer/string alias subitem; other source grammar,
+source compilation to `.mgc`, mixed directory behavior, and native/full gates
+remain open.
+
+FILE5_41 string-modifier slash separators (2026-10-31; finite parser subitem).
+The source parser now accepts the FILE5_41 readability form that places a
+single additional slash between valid string modifiers, such as `/c/t`.
+The separator is consumed only when another modifier follows, so a trailing
+slash remains invalid.
+
+Pure-Go regression coverage verifies that `/c/t` sets both ignore-lowercase
+and text-test flags. Other source grammar, source compilation to `.mgc`, mixed
+directory behavior, and native/full gates remain open.
+
+FILE5_41 strength directive diagnostics (2026-10-31; finite parser subitem).
+`!:strength` now accepts only the FILE5_41 factor operators `+`, `-`, `*`, and
+`/`; `=N` is rejected and `/0` is rejected before strength sorting. This
+prevents a source-only database from silently diverging on an invalid factor.
+Pure-Go regressions cover both rejected forms.
+
+FILE5_41 source structure diagnostics (2026-10-31; finite parser subitem).
+The source parser now rejects relative offsets at level 0 and `name` entries
+below the top level, matching the FILE5_41 parser checks. Pure-Go regressions
+cover both invalid forms; legal continuation and name/use matching remain
+unchanged.
+
+FILE5_41 magicmime compatibility verification (2026-10-31; finite J subitem).
+Package-level regressions now exercise the adapter's actual four-function surface:
+the description handle reports a symbolic link without following it, the MIME
+handle follows the same link, a failed first Open does not poison a later valid
+Open, and Close permits a subsequent Open. The adapter implementation remains
+unchanged because these checks match the inspected cgo wrapper behavior.
+Native FILE5_41 cgo, the full corpus gate, and production import replacement
+remain open.
+FILE5_41 compiled/source fallback boundary (2026-10-31; finite loader subitem).
+Source fallback is now limited to regular requests without an explicit `.mgc`
+suffix. Explicit compiled paths keep the FILE5_41 bad-magic, version, size, and
+entry-count diagnostics; they are not reparsed as source text after a compiled
+load error. Focused loader/source regressions and Go vet pass.
+FILE5_41 mixed compiled/source directory loading (2026-10-31; finite loader subitem).
+The directory loader no longer switches to an `.mgc`-only list when a compiled
+entry is present. It now attempts every visible regular fragment, so compiled
+and source magic files can coexist as in the FILE5_41 directory-loading path.
+Focused regression coverage verifies both the compiled description and source
+MIME rule. Source grammar, native/full corpus gates, and production replacement
+remain open.
+FILE5_41 source trailing escape handling (2026-10-31; finite parser subitem).
+The source-string decoder now drops an isolated backslash at the end of a rule
+line, matching `getstr` rather than preserving the incomplete escape as data.
+A focused parser regression covers the boundary. Other source grammar, native/full
+corpus gates, and production replacement remain open.
+FILE5_41 source string-modifier type validation (2026-10-31; finite parser subitem).
+The source parser now limits `B/H/h/L/J` to `pstring` and permits lowercase `l`
+for `pstring` or regex line-count mode, matching `parse_string_modifier`.
+Focused positive and negative regressions pass. Other source grammar, native/full
+corpus gates, and production replacement remain open.
+FILE5_41 indirect relative source modifier (2026-10-31; finite parser subitem).
+Source rules of type `indirect` now parse `/r` through a dedicated modifier path
+and set the relative-indirect flag. This is separate from string modifiers and is
+covered by a focused parser regression. Other source grammar, native/full corpus
+gates, and production replacement remain open.
+FILE5_41 source modifier diagnostics (2026-10-31; finite parser subitem).
+The parser now rejects modifiers that FILE5_41 rejects for 16-bit strings, rejects
+`W/w` on regex, and rejects `/s` on ordinary or Pascal strings. Valid regex line-count
+and Pascal length modes remain available. Focused regressions pass; other source
+grammar, native/full corpus gates, and production replacement remain open.
+FILE5_41 strength directive ownership (2026-10-31; finite parser subitem).
+The source parser now rejects duplicate `!:strength` directives and strength
+settings on `name` entries, matching `parse_strength`. Existing valid factor
+handling is unchanged. Focused regressions pass; other source grammar, native/full
+corpus gates, and production replacement remain open.
+FILE5_41 real Magdir probe corrections (2026-10-31; finite parser subitem).
+Temporary upstream `python` and `elf` fragments exposed three concrete gaps:
+`search/1/w`, end-of-line `clear x`, and spaced strength `!:strength + 15`.
+The parser now handles all three; both real fragments load successfully through
+`OpenDatabase`. Full source corpus and native/full gates remain open.
+FILE5_41 representative Magdir probe closure (2026-10-31; finite parser/loader subitem).
+Real upstream `archive`, `c-lang`, `commands`, `elf`, `java`, `javascript`, `python`,
+and `unicode` fragments now all load through the pure-Go source loader. The fixes
+covered trailing MIME comments, numeric division masks, `(14.s)` indirect layout,
+and hexadecimal search ranges. This is not the full source corpus or native/full gate.
+FILE5_41 Magdir numeric/indirect probe closure (2026-10-31; finite parser subitem).
+Real fragments exposed and closed indirect `(14.s)` layout, numeric `/` masks,
+hexadecimal search ranges, trailing MIME comments, spaced strength values, and the
+terminal missing-value guard. The broader representative probe loaded 17 additional
+valid fragments; the `filesystems` input was a non-magic numeric include/list file.
+Full source corpus and native/full gates remain open.
+FILE5_41 empty source fragments and directive comments (2026-10-31; finite parser/loader subitem).
+The source loader now accepts comments-only files as valid empty databases, matching
+`apprentice.c:load_1` behavior. `!:strength` and `!:mime` directives now stop at the
+first trailing comment token, allowing real FILE5_41 forms such as `!:strength + 5 # ...`.
+The full upstream `magic/Magdir` probe loaded 326 of 327 files. The only failure is the
+upstream `asf:91` malformed GUID `B61BE100-5B4E-11CF-A8FD-00805F5C44`; strict GUID
+validation is retained rather than accepting malformed source data. Native cgo/full corpus
+and production replacement gates remain open.
+FILE5_41 compiled-directory filtering correction (2026-10-31; finite loader subitem).
+A release-directory regression showed that attempting source parsing on every regular tool
+file makes a directory containing `custom.mgc` and `magic.mgc` fail. The directory loader
+now retains valid source fragments alongside compiled files but ignores parse errors from
+unrelated non-`.mgc` regular files only when at least one compiled database is present.
+Explicit `.mgc` errors and source-only directory errors remain visible. Full pure-Go package
+regression passed with WSL hidden; native cgo/full corpus and production replacement remain open.
+FILE5_41 mixed compiled/source directory regression (2026-10-31; finite loader subitem).
+Added a deterministic regression with one copied v16 compiled database, one valid source
+fragment, and one unrelated regular file. The directory loads both valid databases and
+returns the source MIME rule without being blocked by the unrelated file. Focused and full
+pure-Go regressions plus vet pass; native cgo/full corpus and production replacement remain open.
+FILE5_41 cross-file source-directory ordering (2026-11-01; finite loader subitem).
+The source directory loader now merges all successfully parsed source fragments into one
+logical `sourceMagicFile` before `sourceMagicSet` applies global strength sorting. A real
+cross-file probe with `a: string A weak` and `b: string AB strong` previously returned
+`weak`; it now returns `strong`, matching the FILE5_41 directory-level ordering model.
+A copied 326-file Magdir directory (excluding the known malformed ASF source line) loaded
+as one directory. Native cgo/full corpus and production replacement remain open.
+FILE5_41 cross-file source name/use regression (2026-11-01; finite loader subitem).
+The cross-file source-directory probe is now a permanent regression: a `name` declaration in
+fragment `a` is referenced by a `use` rule in fragment `b`, and the merged directory returns
+`root named, ASCII text, with no line terminators`. Focused regression and vet pass; native
+cgo/full corpus and production replacement remain open.
+FILE5_41 source first MIME annotation (2026-11-01; finite parser subitem).
+Source directives now retain the first `!:mime` value when an entry contains repeated MIME
+annotations, matching the FILE5_41 parser behavior. A focused regression confirms
+`text/first` is returned instead of the later `text/second`. Native cgo/full corpus and
+production replacement remain open.FILE5_41 source strength calculation (2026-10-31; finite parser subitem).
+The source loader now follows apprentice.c:nonmagic for regex strength: escaped bytes count,
+character classes contribute their closing-bracket unit, wildcard metacharacters contribute zero,
+and brace expressions contribute zero. bevarint/levarint also receive the FILE5_41 8-byte weight.
+Focused source regressions pass, the full pure-Go libmagic package passes, and all 326 valid copied
+Magdir fragments load; the only excluded upstream fragment is the malformed ASF GUID. Native
+cgo/cmpcgo, production replacement, and post-replacement full scan remain open.
+FILE5_41 duplicate source MIME boundary (2026-10-31; unresolved native subitem).
+A direct strict duplicate-MIME diagnostic follows the visible parse_extra code, but applying it to
+real copied Magdir fragments rejected 34 files that contain repeated MIME annotations. Because the
+native FILE5_41 compiler is unavailable, the pure-Go loader retains the first MIME annotation so
+all 326 valid source fragments remain loadable. This is recorded as an unresolved native semantic
+boundary, not claimed as final source-parser parity. Pure-Go package, source probe, and vet pass;
+native cgo/cmpcgo and production replacement remain open.
+
+## 2026-10-31：FILE5_41 `!:mime` 当前 rule 归属
+
+按 `apprentice.c:parse_extra` 修正 source parser：`!:mime` 写入当前最后一条 rule，同一 rule 重复注解报错；`!:strength` 继续写 root。root/continuation 归属、首个运行时 MIME、目录 source 合并和完整 Magdir 加载回归通过；native cgo/cmpcgo 与生产替换门禁仍开放。
+
+## 2026-11-01：FILE5_41 compiled parity gate and production import status
+
+The complete `libmagic/cmpcgo/check.sh` gate passed against `file-5.41` with the project v16
+`custom.mgc:magic.mgc` pair: 768 paths, with description, MIME, dispatch signature,
+auxiliary checks, error text, and the combined result all equal at 768/768 (100%). The pure-Go
+package and native cgo comparison tests also passed.
+
+The production Linux call sites now import `magicmime "asky/libmagic"` while retaining the
+former package-level API names. The full client build and post-replacement scan are not claimed
+as passed because this checkout has inconsistent vendor metadata/missing modules and the current
+WSL toolchain cannot obtain them. Source-only duplicate `!:mime` compiler behavior and pending
+cross-request shared-state/concurrency semantics remain separately documented boundaries.
+
+## 2026-11-01: duplicate `!:mime` source diagnostic verification
+
+FILE5_41 `file -C -m` was run against a source fragment containing two `!:mime` directives for one
+entry. The compiler emitted `Current entry already has a MIME type`, returned failure, and did not emit
+a valid compiled database. The pure-Go parser's duplicate-MIME rejection is therefore source-aligned at
+the diagnostic/result-class level. Exact warning formatting is intentionally not treated as a production
+output promise; compiled database behavior remains covered separately by the native parity gate.
